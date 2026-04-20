@@ -2,7 +2,7 @@
 
 A real-time AI meeting copilot that listens to live audio, transcribes it, and continuously surfaces 3 useful suggestions based on what is being said. Clicking a suggestion streams a detailed, transcript-grounded answer into a chat panel.
 
-**Live demo:** `https://your-netlify-url.netlify.app`  
+**Live demo:** `twinmind-live-suggestions.netlify.app`  
 **Assignment:** TwinMind Live Suggestions — April 2026
 
 ---
