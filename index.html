@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TwinMind — Live meeting copilot</title>
+  <style>
+    :root {
+      --color-bg: #0c0e12;
+      --color-surface: #141820;
+      --color-surface-elevated: #1a202c;
+      --color-border: #2a3140;
+      --color-text: #e8ecf4;
+      --color-text-muted: #8b95a8;
+      --color-accent: #5b8cff;
+      --color-accent-soft: rgba(91, 140, 255, 0.15);
+      --color-success: #3dd68c;
+      --color-warning: #f5a623;
+      --color-danger: #ff5c5c;
+      --color-type-question: #7c9eff;
+      --color-type-answer: #3dd68c;
+      --color-type-factcheck: #f5a623;
+      --color-type-talkingpoint: #c792ea;
+      --color-type-clarify: #89ddff;
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 12px;
+      --space-lg: 16px;
+      --space-xl: 24px;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+      --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.35);
+      --transition-fast: 0.15s ease;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.45;
+      color: var(--color-text);
+      background: var(--color-bg);
+      overflow: hidden;
+    }
+
+    #root { height: 100%; display: flex; flex-direction: column; }
+
+    .app-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-lg);
+      padding: var(--space-md) var(--space-xl);
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-border);
+      flex-shrink: 0;
+    }
+    .top-bar-left { display: flex; align-items: center; gap: var(--space-lg); }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-weight: 700;
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+    }
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--color-accent), #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .session-timer {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      color: var(--color-text-muted);
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-xs) var(--space-md);
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-elevated);
+    }
+    .status-badge.status-idle { color: var(--color-text-muted); }
+    .status-badge.status-recording { color: var(--color-success); border-color: rgba(61, 214, 140, 0.35); }
+    .status-badge.status-transcribing { color: var(--color-warning); border-color: rgba(245, 166, 35, 0.35); }
+    .status-badge.status-generating { color: var(--color-accent); border-color: rgba(91, 140, 255, 0.35); }
+
+    .top-bar-actions { display: flex; align-items: center; gap: var(--space-sm); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-elevated);
+      color: var(--color-text);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+    }
+    .btn:hover { background: var(--color-border); border-color: #3a4255; }
+    .btn-primary {
+      background: var(--color-accent);
+      border-color: transparent;
+      color: #fff;
+    }
+    .btn-primary:hover { filter: brightness(1.08); background: var(--color-accent); border-color: transparent; }
+    .btn-danger { border-color: rgba(255, 92, 92, 0.4); color: var(--color-danger); }
+    .btn-danger:hover { background: rgba(255, 92, 92, 0.1); }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0;
+      flex: 1;
+      min-height: 0;
+    }
+    @media (max-width: 1100px) {
+      .main-grid { grid-template-columns: 1fr; grid-template-rows: auto auto auto; overflow-y: auto; }
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      border-right: 1px solid var(--color-border);
+      background: var(--color-bg);
+    }
+    .panel:last-child { border-right: none; }
+    .panel-header {
+      padding: var(--space-md) var(--space-lg);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-text-muted);
+      border-bottom: 1px solid var(--color-border);
+      flex-shrink: 0;
+    }
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--space-lg);
+      min-height: 0;
+    }
+
+    .transcript-chunk {
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-lg);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .transcript-chunk:last-child { border-bottom: none; }
+    .transcript-time {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-xs);
+    }
+    .transcript-text { color: var(--color-text); }
+    .transcript-live {
+      margin-top: var(--space-md);
+      padding: var(--space-md);
+      border-radius: var(--radius-md);
+      background: var(--color-accent-soft);
+      border: 1px dashed rgba(91, 140, 255, 0.35);
+      font-size: 0.8rem;
+      color: var(--color-accent);
+      font-style: italic;
+    }
+
+    .suggestions-toolbar {
+      padding: 0 var(--space-lg) var(--space-md);
+      flex-shrink: 0;
+    }
+    .countdown-wrap {
+      height: 4px;
+      background: var(--color-border);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: var(--space-md);
+    }
+    .countdown-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--color-accent), #8b5cf6);
+      border-radius: 999px;
+      transition: width 1s linear;
+    }
+    .countdown-label {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-sm);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .skeleton-card {
+      height: 72px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-surface-elevated) 50%, var(--color-surface) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s ease-in-out infinite;
+      margin-bottom: var(--space-md);
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .batch-block { margin-bottom: var(--space-xl); }
+    .batch-time {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-md);
+      font-family: var(--font-mono);
+    }
+
+    .suggestion-card {
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      margin-bottom: var(--space-md);
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .suggestion-card:hover { border-color: #3a4558; box-shadow: var(--shadow-panel); }
+    .suggestion-card-inner {
+      display: flex;
+      min-height: 0;
+    }
+    .suggestion-card-border {
+      width: 4px;
+      flex-shrink: 0;
+    }
+    .type-question .suggestion-card-border { background: var(--color-type-question); }
+    .type-answer .suggestion-card-border { background: var(--color-type-answer); }
+    .type-factcheck .suggestion-card-border { background: var(--color-type-factcheck); }
+    .type-talkingpoint .suggestion-card-border { background: var(--color-type-talkingpoint); }
+    .type-clarify .suggestion-card-border { background: var(--color-type-clarify); }
+
+    .suggestion-card-content { padding: var(--space-md) var(--space-lg); flex: 1; min-width: 0; }
+    .suggestion-type-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
+    }
+    .type-tag {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--color-surface-elevated);
+      color: var(--color-text-muted);
+    }
+    .type-question .type-tag { color: var(--color-type-question); background: rgba(124, 158, 255, 0.12); }
+    .type-answer .type-tag { color: var(--color-type-answer); background: rgba(61, 214, 140, 0.12); }
+    .type-factcheck .type-tag { color: var(--color-type-factcheck); background: rgba(245, 166, 35, 0.12); }
+    .type-talkingpoint .type-tag { color: var(--color-type-talkingpoint); background: rgba(199, 146, 234, 0.12); }
+    .type-clarify .type-tag { color: var(--color-type-clarify); background: rgba(137, 221, 255, 0.12); }
+
+    .suggestion-preview { font-size: 0.9rem; color: var(--color-text); line-height: 1.4; }
+    .suggestion-card-hint {
+      margin-top: var(--space-sm);
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+      line-height: 1.35;
+    }
+    .suggestion-detail {
+      margin-top: var(--space-md);
+      padding-top: var(--space-md);
+      border-top: 1px solid var(--color-border);
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
+    .suggestion-card.clicked { border-color: rgba(91, 140, 255, 0.45); background: var(--color-surface-elevated); }
+
+    .chat-messages { display: flex; flex-direction: column; gap: var(--space-md); }
+    .chat-bubble {
+      max-width: 92%;
+      padding: var(--space-md) var(--space-lg);
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .chat-bubble-user {
+      align-self: flex-end;
+      background: var(--color-accent);
+      color: #fff;
+      margin-left: auto;
+    }
+    .chat-bubble-assistant {
+      align-self: flex-start;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+    }
+    .chat-meta {
+      font-size: 0.65rem;
+      color: rgba(255,255,255,0.7);
+      margin-top: var(--space-xs);
+    }
+    .chat-bubble-assistant .chat-meta { color: var(--color-text-muted); }
+    .from-suggestion-label {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-accent);
+      margin-bottom: var(--space-sm);
+    }
+    .chat-suggestion-anchor {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+    }
+    .form-readonly {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--color-border);
+      background: var(--color-bg);
+    }
+    .modal-actions {
+      display: flex;
+      gap: var(--space-sm);
+      justify-content: flex-end;
+    }
+    .stream-cursor {
+      display: inline-block;
+      width: 7px;
+      height: 1em;
+      margin-left: 2px;
+      background: var(--color-accent);
+      vertical-align: text-bottom;
+      animation: blink 0.8s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .chat-input-row {
+      display: flex;
+      gap: var(--space-sm);
+      padding: var(--space-md) var(--space-lg);
+      border-top: 1px solid var(--color-border);
+      flex-shrink: 0;
+      background: var(--color-surface);
+    }
+    .chat-input-row input {
+      flex: 1;
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-size: 0.875rem;
+    }
+    .chat-input-row input:focus { outline: none; border-color: var(--color-accent); }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: var(--space-xl);
+    }
+    .modal {
+      width: min(560px, 100%);
+      max-height: 90vh;
+      overflow-y: auto;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-panel);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-lg);
+      border-bottom: 1px solid var(--color-border);
+      font-weight: 600;
+    }
+    .modal-body { padding: var(--space-lg); }
+    .form-group { margin-bottom: var(--space-lg); }
+    .form-group label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-sm);
+    }
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: inherit;
+      font-size: 0.875rem;
+    }
+    .form-group textarea { min-height: 100px; resize: vertical; font-family: var(--font-mono); font-size: 0.8rem; }
+
+    .toast-container {
+      position: fixed;
+      bottom: var(--space-xl);
+      right: var(--space-xl);
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      max-width: 360px;
+    }
+    .toast {
+      padding: var(--space-md) var(--space-lg);
+      border-radius: var(--radius-md);
+      font-size: 0.85rem;
+      box-shadow: var(--shadow-panel);
+      border: 1px solid var(--color-border);
+      animation: toastIn 0.2s ease;
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .toast-error { background: #2a1518; color: #ffb4b4; border-color: rgba(255,92,92,0.4); }
+    .toast-success { background: #0f2418; color: #a8f5cf; border-color: rgba(61,214,140,0.35); }
+    .toast-info { background: var(--color-surface-elevated); color: var(--color-text); }
+
+    .markdown-lite strong { color: var(--color-text); }
+    .markdown-lite code {
+      font-family: var(--font-mono);
+      font-size: 0.8em;
+      background: var(--color-bg);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.2.0",
+      "react-dom/client": "https://esm.sh/react-dom@18.2.0/client"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import React, { useState, useEffect, useRef, useCallback } from "react";
+    import { createRoot } from "react-dom/client";
+
+    const h = React.createElement;
+    const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
+    const GROQ_TRANSCRIBE_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+    const WHISPER_MODEL = "whisper-large-v3";
+
+    const SETTINGS_KEY = "twinmind_settings_v1";
+
+    const DEFAULT_SUGGESTION_PROMPT = `You are a real-time AI meeting copilot. A conversation is happening right now. Your job is to surface the 3 most useful things the listener could know or do in the next 30 seconds.
+
+Each suggestion must be one of these types — choose based on what the conversation actually needs:
+- QUESTION: A sharp follow-up question that would move the conversation forward
+- ANSWER: A direct answer to something that was just asked
+- FACTCHECK: Verify, correct, or add important nuance to a specific claim just made
+- TALKINGPOINT: A relevant insight, stat, or framing worth introducing right now
+- CLARIFY: Surface an ambiguity or unstated assumption that should be addressed
+
+Rules that separate good suggestions from bad ones:
+- Read the last 2-3 exchanges carefully. What just happened? What does the listener need right now?
+- Never be generic. "Ask about their goals" is useless. "Ask why they chose PostgreSQL over MongoDB given the scale they mentioned" is useful.
+- The preview must deliver real standalone value in one sentence (max 100 chars). A user who never clicks should still benefit.
+- The detail adds 2-4 sentences: deeper context, supporting data, or concrete next steps.
+- Mix types intelligently. Don't always give 3 questions. Read the room.
+- If someone just asked a question, ANSWER it. If a dubious claim was made, FACTCHECK it. If a decision point is approaching, surface a TALKINGPOINT.
+
+Return ONLY a valid JSON array. No markdown, no explanation, no preamble:
+[
+  {"type":"QUESTION","preview":"One crisp sentence of standalone value","detail":"2-4 sentences of depth."},
+  {"type":"ANSWER","preview":"...","detail":"..."},
+  {"type":"TALKINGPOINT","preview":"...","detail":"..."}
+]`;
+
+    const DEFAULT_CHAT_SYSTEM_PROMPT = `You are an expert meeting copilot with full access to the conversation transcript below. When answering, always ground your response in what was actually said — reference specific statements, decisions, and people mentioned. Be direct, specific, and useful. Use light markdown when it improves readability. Never give generic advice when you have transcript context to work from.`;
+
+    const DEFAULT_CLICK_DETAIL_PROMPT = `The user clicked on a suggestion during a live meeting. Give them a thorough, immediately useful answer grounded in the transcript. Cover: what was specifically said that makes this relevant, the key insight or answer, any important caveats or nuances, and one concrete next step if applicable. Be specific — this person is in a meeting right now and needs to act on this.`;
+
+    function loadSettings() {
+      try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (raw) {
+          const p = JSON.parse(raw);
+          return {
+            apiKey: p.apiKey || "",
+            suggestionPrompt: p.suggestionPrompt ?? DEFAULT_SUGGESTION_PROMPT,
+            chatSystemPrompt: p.chatSystemPrompt ?? DEFAULT_CHAT_SYSTEM_PROMPT,
+            clickDetailPrompt: p.clickDetailPrompt ?? DEFAULT_CLICK_DETAIL_PROMPT,
+            suggestionContextWindow: p.suggestionContextWindow ?? "1500",
+            clickDetailContextWindow: p.clickDetailContextWindow ?? "2500",
+            chatContextWindow: p.chatContextWindow ?? "3000",
+            refreshInterval: p.refreshInterval ?? "30",
+          };
+        }
+      } catch (_) { /* ignore */ }
+      return {
+        apiKey: "",
+        suggestionPrompt: DEFAULT_SUGGESTION_PROMPT,
+        chatSystemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT,
+        clickDetailPrompt: DEFAULT_CLICK_DETAIL_PROMPT,
+        suggestionContextWindow: "1500",
+        clickDetailContextWindow: "2500",
+        chatContextWindow: "3000",
+        refreshInterval: "30",
+      };
+    }
+
+    function saveSettings(s) {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+      } catch (_) { /* ignore */ }
+    }
+
+    function formatTime(iso) {
+      try {
+        const d = new Date(iso);
+        return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      } catch {
+        return iso;
+      }
+    }
+
+    function formatSession(ms) {
+      const s = Math.floor(ms / 1000);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      return [h, m, sec].map((n) => String(n).padStart(2, "0")).join(":");
+    }
+
+    function tailChars(text, n) {
+      const lim = Math.max(0, parseInt(String(n), 10) || 0);
+      if (!text || lim === 0) return "";
+      return text.length <= lim ? text : text.slice(-lim);
+    }
+
+    function transcriptToString(chunks) {
+      return chunks.map((c) => `[${c.time}] ${c.text}`).join("\n");
+    }
+
+    async function groqTranscribe(apiKey, audioBlob) {
+      try {
+        const formData = new FormData();
+        formData.append("file", audioBlob, "chunk.webm");
+        formData.append("model", WHISPER_MODEL);
+        formData.append("response_format", "json");
+        const res = await fetch(GROQ_TRANSCRIBE_URL, {
+          method: "POST",
+          headers: { Authorization: "Bearer " + apiKey },
+          body: formData,
+        });
+        const text = await res.text();
+        if (!res.ok) throw new Error(text || "Transcription failed");
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          throw new Error("Invalid transcription response");
+        }
+        return (json.text || "").trim();
+      } catch (e) {
+        throw e instanceof Error ? e : new Error(String(e));
+      }
+    }
+
+    async function groqChatStream({ apiKey, messages, temperature = 0.5 }) {
+      try {
+        const res = await fetch(GROQ_CHAT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + apiKey,
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-oss-120b",
+            messages,
+            stream: true,
+            temperature,
+          }),
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(errText || "Chat request failed");
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let carry = "";
+        async function* gen() {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            carry += decoder.decode(value, { stream: true });
+            const parts = carry.split("\n");
+            carry = parts.pop() || "";
+            for (const line of parts) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith("data:")) continue;
+              const data = trimmed.slice(5).trim();
+              if (data === "[DONE]") return;
+              try {
+                const j = JSON.parse(data);
+                const delta = j.choices?.[0]?.delta?.content;
+                if (delta) yield delta;
+              } catch {
+                /* ignore malformed SSE line */
+              }
+            }
+          }
+        }
+        return gen();
+      } catch (e) {
+        throw e instanceof Error ? e : new Error(String(e));
+      }
+    }
+
+    async function collectStream(streamGen) {
+      try {
+        let full = "";
+        for await (const chunk of streamGen) full += chunk;
+        return full;
+      } catch (e) {
+        throw e instanceof Error ? e : new Error(String(e));
+      }
+    }
+
+    function genMsgId() {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+      }
+      return String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+    }
+
+    const VALID_TYPES = new Set(["QUESTION", "ANSWER", "FACTCHECK", "TALKINGPOINT", "CLARIFY"]);
+
+    function parseSuggestionJson(raw) {
+      let s = raw.trim();
+      const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (fence) s = fence[1].trim();
+      const start = s.indexOf("[");
+      const end = s.lastIndexOf("]");
+      if (start === -1 || end === -1 || end <= start) throw new Error("No JSON array in model output");
+      s = s.slice(start, end + 1);
+      let arr;
+      try {
+        arr = JSON.parse(s);
+      } catch (e) {
+        throw new Error("Suggestions JSON parse error: " + (e.message || "invalid"));
+      }
+      if (!Array.isArray(arr)) throw new Error("Suggestions must be a JSON array");
+      const items = [];
+      for (const el of arr.slice(0, 5)) {
+        if (!el || typeof el !== "object") continue;
+        const type = String(el.type || "").toUpperCase();
+        const preview = String(el.preview || "").trim();
+        const detail = String(el.detail || "").trim();
+        if (!VALID_TYPES.has(type) || !preview) continue;
+        items.push({
+          type,
+          preview: preview.slice(0, 160),
+          detail: detail || preview,
+          clicked: false,
+        });
+        if (items.length >= 3) break;
+      }
+      if (items.length === 0) throw new Error("Model returned no valid suggestions");
+      const pad = items[items.length - 1];
+      while (items.length < 3 && pad) {
+        items.push({
+          type: pad.type,
+          preview: (pad.preview + " (alt angle)").slice(0, 160),
+          detail: pad.detail,
+          clicked: false,
+        });
+      }
+      return items.slice(0, 3);
+    }
+
+    function simpleMarkdownToHtml(md) {
+      if (!md) return "";
+      let htm = md
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      htm = htm.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      htm = htm.replace(/`([^`]+)`/g, "<code>$1</code>");
+      htm = htm.replace(/^- (.+)$/gm, "• $1");
+      htm = htm.replace(/\n/g, "<br/>");
+      return htm;
+    }
+
+    const ICONS = {
+      logo: "M6 4h12v4H6V4zm0 6h12v10H6V10zm2 2v6h8v-6H8z",
+      mic: "M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3h-2c0 2.76-2.24 5-5 5s-5-2.24-5-5H7c0 3.07 2.13 5.64 5 5.95V19H9v2h6v-2h-3v-3.05c2.87-.31 5-2.88 5-5.95z",
+      settings: "M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z",
+      download: "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z",
+      send: "M2.01 21L23 12 2.01 3 2 10l15 2-15 2z",
+      close: "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+      refresh: "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z",
+      spark: "M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66 1.34-3 3-3 .6 0 1-.4 1-1s-.4-1-1-1c-1.66 0-3-1.34-3-3 0-2.21 1.79-4 4-4 1.51 0 3.08.78 4 2-.84 0-2 .69-2 2 0 1.66 1.34 3 3 3s3-1.34 3-3c0-2.21-1.79-4-4-4-3.31 0-6 2.69-6 6 0 1.66-1.34 3-3 3zm2.5-6C9.84 8 9 7.16 9 6.25S9.84 4.5 10.75 4.5s1.75.84 1.75 1.75S11.66 8 10.75 8z",
+    };
+
+    function Icon({ name, size = 18, className = "" }) {
+      const d = ICONS[name];
+      if (!d) return null;
+      return h(
+        "svg",
+        {
+          className,
+          width: size,
+          height: size,
+          viewBox: "0 0 24 24",
+          fill: "currentColor",
+          "aria-hidden": true,
+        },
+        h("path", { d })
+      );
+    }
+
+    function useToasts() {
+      const [toasts, setToasts] = useState([]);
+      const push = useCallback((message, type = "error") => {
+        const id = Date.now() + Math.random();
+        setToasts((t) => [...t, { id, message, type }]);
+        setTimeout(() => {
+          setToasts((t) => t.filter((x) => x.id !== id));
+        }, type === "error" ? 6000 : 3500);
+      }, []);
+      const ToastHost = h(
+        "div",
+        { className: "toast-container", "aria-live": "polite" },
+        toasts.map((t) =>
+          h(
+            "div",
+            {
+              key: t.id,
+              className: "toast toast-" + (t.type === "success" ? "success" : t.type === "info" ? "info" : "error"),
+            },
+            t.message
+          )
+        )
+      );
+      return { push, ToastHost };
+    }
+
+    function App() {
+      const { push, ToastHost } = useToasts();
+      const [settings, setSettings] = useState(() => loadSettings());
+      const [settingsOpen, setSettingsOpen] = useState(false);
+      const [transcriptChunks, setTranscriptChunks] = useState([]);
+      const [suggestionBatches, setSuggestionBatches] = useState([]);
+      const [chatMessages, setChatMessages] = useState([]);
+      const [status, setStatus] = useState("Idle");
+      const [recording, setRecording] = useState(false);
+      const [liveHint, setLiveHint] = useState(false);
+      const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+      const [countdownSec, setCountdownSec] = useState(parseInt(settings.refreshInterval, 10) || 30);
+      const [sessionMs, setSessionMs] = useState(0);
+      const [chatInput, setChatInput] = useState("");
+
+      const settingsRef = useRef(settings);
+      const transcriptRef = useRef(transcriptChunks);
+      const chatRef = useRef(chatMessages);
+      const recordingRef = useRef(recording);
+      settingsRef.current = settings;
+      transcriptRef.current = transcriptChunks;
+      chatRef.current = chatMessages;
+      recordingRef.current = recording;
+
+      const mediaRecorderRef = useRef(null);
+      const chunksRef = useRef([]);
+      const streamRef = useRef(null);
+      const batchIdRef = useRef(0);
+      const sessionTimerRef = useRef(null);
+      const countdownTimerRef = useRef(null);
+      const refreshBusyRef = useRef(false);
+      const suggestionBusyRef = useRef(false);
+
+      const refreshSec = Math.max(5, parseInt(settings.refreshInterval, 10) || 30);
+
+      useEffect(() => {
+        saveSettings(settings);
+      }, [settings]);
+
+      useEffect(() => {
+        if (!recording) return;
+        sessionTimerRef.current = setInterval(() => {
+          setSessionMs((m) => m + 1000);
+        }, 1000);
+        return () => clearInterval(sessionTimerRef.current);
+      }, [recording]);
+
+      useEffect(() => {
+        if (!recording) return;
+        setCountdownSec(refreshSec);
+      }, [refreshSec, recording]);
+
+      const runSuggestionCycle = useCallback(
+        async (transcriptStr) => {
+          const s = settingsRef.current;
+          if (!s.apiKey) {
+            push("Add your Groq API key in Settings.", "error");
+            return;
+          }
+          const ctx = tailChars(transcriptStr || "", parseInt(s.suggestionContextWindow, 10) || 1500);
+          const userMsg =
+            "Recent transcript (newest at bottom):\n" +
+            (ctx || "_(No transcript text yet — infer only if the meeting just started.)_") +
+            "\n\nProduce exactly 3 suggestions following the rules. Return ONLY the JSON array.";
+          setSuggestionsLoading(true);
+          setStatus("Generating...");
+          try {
+            const stream = await groqChatStream({
+              apiKey: s.apiKey,
+              messages: [
+                { role: "system", content: s.suggestionPrompt },
+                { role: "user", content: userMsg },
+              ],
+              temperature: 0.45,
+            });
+            const raw = await collectStream(stream);
+            const items = parseSuggestionJson(raw);
+            const id = ++batchIdRef.current;
+            const timestamp = new Date().toISOString();
+            setSuggestionBatches((b) => [{ id, timestamp, items }, ...b]);
+            push("Suggestions updated.", "success");
+          } catch (e) {
+            push(e.message || "Suggestion generation failed", "error");
+          } finally {
+            setSuggestionsLoading(false);
+            if (recordingRef.current) setStatus("Recording");
+            else setStatus("Idle");
+          }
+        },
+        [push]
+      );
+
+      const transcribeAndSuggest = useCallback(async () => {
+        refreshBusyRef.current = true;
+        try {
+          const s = settingsRef.current;
+          if (!s.apiKey) {
+            push("Add your Groq API key in Settings.", "error");
+            return;
+          }
+          const parts = chunksRef.current.splice(0, chunksRef.current.length);
+          if (parts.length > 0) {
+            const blob = new Blob(parts, { type: parts[0].type || "audio/webm" });
+            if (blob.size < 2000) {
+              chunksRef.current = parts.concat(chunksRef.current);
+            } else {
+              setStatus("Transcribing...");
+              try {
+                const text = await groqTranscribe(s.apiKey, blob);
+                if (text) {
+                  const time = new Date().toISOString();
+                  const merged = [...transcriptRef.current, { time, text }];
+                  transcriptRef.current = merged;
+                  setTranscriptChunks(merged);
+                }
+              } catch (e) {
+                chunksRef.current = parts.concat(chunksRef.current);
+                push(e.message || "Transcription failed", "error");
+                if (recordingRef.current) setStatus("Recording");
+                else setStatus("Idle");
+                return;
+              }
+            }
+          }
+          const current = transcriptToString(transcriptRef.current);
+          await runSuggestionCycle(current);
+        } catch (e) {
+          push(e.message || "Refresh cycle failed", "error");
+        } finally {
+          refreshBusyRef.current = false;
+          if (recordingRef.current) setStatus("Recording");
+          else setStatus("Idle");
+        }
+      }, [push, runSuggestionCycle]);
+
+      useEffect(() => {
+        if (!recording) {
+          if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+          return;
+        }
+        let remain = refreshSec;
+        setCountdownSec(remain);
+        countdownTimerRef.current = setInterval(() => {
+          if (refreshBusyRef.current || suggestionBusyRef.current) return;
+          remain -= 1;
+          if (remain <= 0) {
+            remain = refreshSec;
+            transcribeAndSuggest();
+          }
+          setCountdownSec(remain);
+        }, 1000);
+        return () => clearInterval(countdownTimerRef.current);
+      }, [recording, refreshSec, transcribeAndSuggest]);
+
+      const startRecording = useCallback(async () => {
+        if (!settings.apiKey) {
+          push("Configure your API key in Settings first.", "error");
+          setSettingsOpen(true);
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          streamRef.current = stream;
+          const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+            ? "audio/webm;codecs=opus"
+            : "audio/webm";
+          const mr = new MediaRecorder(stream, { mimeType: mime });
+          chunksRef.current = [];
+          mr.ondataavailable = (ev) => {
+            if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
+          };
+          mr.start(1000);
+          mediaRecorderRef.current = mr;
+          setRecording(true);
+          setLiveHint(true);
+          setSessionMs(0);
+          setStatus("Recording");
+          push("Recording started.", "info");
+        } catch (e) {
+          push(e.message || "Could not access microphone", "error");
+        }
+      }, [settings.apiKey, push]);
+
+      const stopRecording = useCallback(() => {
+        try {
+          const mr = mediaRecorderRef.current;
+          if (mr && mr.state !== "inactive") mr.stop();
+        } catch (_) { /* ignore */ }
+        mediaRecorderRef.current = null;
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+        }
+        setRecording(false);
+        setLiveHint(false);
+        setStatus("Idle");
+        push("Recording stopped.", "info");
+      }, [push]);
+
+      const manualRefresh = useCallback(async () => {
+        try {
+          const mr = mediaRecorderRef.current;
+          if (mr && mr.state === "recording") {
+            await new Promise((resolve) => {
+              const done = () => {
+                mr.removeEventListener("dataavailable", onData);
+                resolve();
+              };
+              const onData = () => done();
+              mr.addEventListener("dataavailable", onData);
+              mr.requestData();
+              setTimeout(done, 800);
+            });
+          }
+          await transcribeAndSuggest();
+          setCountdownSec(refreshSec);
+        } catch (e) {
+          push(e.message || "Manual refresh failed", "error");
+        }
+      }, [transcribeAndSuggest, refreshSec, push]);
+
+      const exportJson = useCallback(() => {
+        try {
+          const payload = {
+            exportedAt: new Date().toISOString(),
+            transcriptChunks,
+            suggestionBatches,
+            chatMessages: chatMessages.map(({ streaming, ...rest }) => rest),
+          };
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "twinmind-export-" + Date.now() + ".json";
+          a.click();
+          URL.revokeObjectURL(a.href);
+          push("Export downloaded.", "success");
+        } catch (e) {
+          push(e.message || "Export failed", "error");
+        }
+      }, [transcriptChunks, suggestionBatches, chatMessages, push]);
+
+      const sendChat = useCallback(
+        async (content) => {
+          const s = settingsRef.current;
+          const trimmed = (content || "").trim();
+          if (!trimmed) return;
+          if (!s.apiKey) {
+            push("API key required for chat.", "error");
+            return;
+          }
+          const userTime = new Date().toISOString();
+          const transcriptStr = transcriptToString(transcriptRef.current);
+          const ctx = tailChars(transcriptStr, parseInt(s.chatContextWindow, 10) || 3000);
+          const prior = chatRef.current.filter((x) => !x.streaming);
+          const userId = genMsgId();
+          const assistantId = genMsgId();
+          setChatMessages((m) => [
+            ...m,
+            { id: userId, role: "user", content: trimmed, time: userTime, fromSuggestion: false },
+            { id: assistantId, role: "assistant", content: "", time: userTime, streaming: true, fromSuggestion: false },
+          ]);
+          const messagesForApi = [
+            {
+              role: "system",
+              content:
+                s.chatSystemPrompt +
+                "\n\n---\nTranscript context (may be truncated):\n" +
+                ctx,
+            },
+            ...prior.slice(-16).map((x) => ({ role: x.role, content: x.content })),
+            { role: "user", content: trimmed },
+          ];
+          try {
+            const stream = await groqChatStream({
+              apiKey: s.apiKey,
+              messages: messagesForApi,
+              temperature: 0.55,
+            });
+            let acc = "";
+            for await (const delta of stream) {
+              acc += delta;
+              setChatMessages((m) =>
+                m.map((x) => (x.id === assistantId && x.streaming ? { ...x, content: acc } : x))
+              );
+            }
+            setChatMessages((m) =>
+              m.map((x) =>
+                x.id === assistantId
+                  ? { ...x, content: acc, streaming: false, time: new Date().toISOString() }
+                  : x
+              )
+            );
+          } catch (e) {
+            setChatMessages((m) => m.filter((x) => x.id !== userId && x.id !== assistantId));
+            push(e.message || "Chat failed", "error");
+          }
+        },
+        [push]
+      );
+
+      const clearChat = useCallback(() => {
+        setChatMessages([]);
+        push("Chat cleared.", "info");
+      }, [push]);
+
+      const onSuggestionClick = useCallback(
+        async (batchId, index, item) => {
+          if (suggestionBusyRef.current) return;
+          const s = settingsRef.current;
+          if (!s.apiKey) {
+            push("API key required.", "error");
+            return;
+          }
+          let assistantId = null;
+          suggestionBusyRef.current = true;
+          refreshBusyRef.current = true;
+          try {
+            const transcriptStr = transcriptToString(transcriptRef.current);
+            const ctx = tailChars(transcriptStr, parseInt(s.clickDetailContextWindow, 10) || 2500);
+            setSuggestionBatches((batches) =>
+              batches.map((b) =>
+                b.id !== batchId
+                  ? b
+                  : {
+                      ...b,
+                      items: b.items.map((it, i) => (i === index ? { ...it, clicked: true } : it)),
+                    }
+              )
+            );
+            assistantId = genMsgId();
+            const t0 = new Date().toISOString();
+            setChatMessages((m) => [
+              ...m,
+              {
+                id: assistantId,
+                role: "assistant",
+                content: "",
+                time: t0,
+                streaming: true,
+                fromSuggestion: true,
+                suggestionPreview: item.preview,
+                suggestionType: item.type,
+              },
+            ]);
+            const userPayload =
+              "Clicked suggestion:\nType: " +
+              item.type +
+              "\nPreview: " +
+              item.preview +
+              "\nDetail (from card): " +
+              item.detail +
+              "\n\nTranscript context:\n" +
+              ctx;
+            const stream = await groqChatStream({
+              apiKey: s.apiKey,
+              messages: [
+                { role: "system", content: s.clickDetailPrompt },
+                { role: "user", content: userPayload },
+              ],
+              temperature: 0.5,
+            });
+            let acc = "";
+            for await (const delta of stream) {
+              acc += delta;
+              setChatMessages((m) =>
+                m.map((x) => (x.id === assistantId && x.streaming ? { ...x, content: acc } : x))
+              );
+            }
+            setChatMessages((m) =>
+              m.map((x) =>
+                x.id === assistantId
+                  ? { ...x, content: acc, streaming: false, time: new Date().toISOString() }
+                  : x
+              )
+            );
+          } catch (e) {
+            if (assistantId) {
+              setChatMessages((m) => m.filter((x) => x.id !== assistantId));
+            }
+            push(e.message || "Could not expand suggestion", "error");
+          } finally {
+            suggestionBusyRef.current = false;
+            refreshBusyRef.current = false;
+          }
+        },
+        [push]
+      );
+
+      const countdownPct = recording ? (countdownSec / refreshSec) * 100 : 0;
+
+      const statusClass =
+        status === "Recording"
+          ? "status-recording"
+          : status === "Transcribing..."
+          ? "status-transcribing"
+          : status === "Generating..."
+          ? "status-generating"
+          : "status-idle";
+
+      return h(
+        "div",
+        { className: "app-shell" },
+        ToastHost,
+        settingsOpen &&
+          h(SettingsModal, {
+            settings,
+            onSave: (next) => {
+              setSettings(next);
+              setSettingsOpen(false);
+              push("Settings saved.", "success");
+            },
+            onClose: () => setSettingsOpen(false),
+          }),
+        h(
+          "header",
+          { className: "top-bar" },
+          h(
+            "div",
+            { className: "top-bar-left" },
+            h(
+              "div",
+              { className: "logo" },
+              h("div", { className: "logo-mark" }, h(Icon, { name: "spark", size: 18 })),
+              "TwinMind"
+            ),
+            h("div", { className: "session-timer" }, formatSession(sessionMs)),
+            h("div", { className: "status-badge " + statusClass }, status)
+          ),
+          h(
+            "div",
+            { className: "top-bar-actions" },
+            !recording
+              ? h(
+                  "button",
+                  { type: "button", className: "btn btn-primary", onClick: startRecording },
+                  h(Icon, { name: "mic", size: 18 }),
+                  " Start"
+                )
+              : h(
+                  "button",
+                  { type: "button", className: "btn btn-danger", onClick: stopRecording },
+                  "Stop"
+                ),
+            h(
+              "button",
+              {
+                type: "button",
+                className: "btn",
+                onClick: manualRefresh,
+                disabled: status === "Transcribing..." || status === "Generating...",
+              },
+              h(Icon, { name: "refresh", size: 18 }),
+              " Refresh"
+            ),
+            h(
+              "button",
+              { type: "button", className: "btn", onClick: exportJson },
+              h(Icon, { name: "download", size: 18 }),
+              " Export"
+            ),
+            h(
+              "button",
+              { type: "button", className: "btn", onClick: () => setSettingsOpen(true) },
+              h(Icon, { name: "settings", size: 18 }),
+              " Settings"
+            )
+          )
+        ),
+        h(
+          "main",
+          { className: "main-grid" },
+          h(TranscriptPanel, { chunks: transcriptChunks, liveHint }),
+          h(SuggestionsPanel, {
+            batches: suggestionBatches,
+            loading: suggestionsLoading,
+            countdownSec,
+            refreshSec,
+            countdownPct,
+            recording,
+            onCardClick: onSuggestionClick,
+          }),
+          h(ChatPanel, {
+            messages: chatMessages,
+            input: chatInput,
+            setInput: setChatInput,
+            onSend: () => {
+              const t = chatInput;
+              setChatInput("");
+              sendChat(t);
+            },
+            onClear: clearChat,
+          })
+        )
+      );
+    }
+
+    function SettingsModal({ settings, onSave, onClose }) {
+      const [draft, setDraft] = useState(settings);
+      useEffect(() => {
+        setDraft(settings);
+      }, [settings]);
+      return h(
+        "div",
+        {
+          className: "modal-overlay",
+          onClick: (e) => e.target === e.currentTarget && onClose(),
+          role: "dialog",
+          "aria-modal": true,
+          "aria-labelledby": "settings-title",
+        },
+        h(
+          "div",
+          { className: "modal" },
+          h(
+            "div",
+            { className: "modal-header" },
+            h("span", { id: "settings-title" }, "Settings"),
+            h(
+              "button",
+              { type: "button", className: "btn", onClick: onClose, "aria-label": "Close" },
+              h(Icon, { name: "close", size: 20 })
+            )
+          ),
+          h(
+            "div",
+            { className: "modal-body" },
+            h(
+              "div",
+              { className: "form-group" },
+              h("label", { htmlFor: "apiKey" }, "API Key"),
+              h("input", {
+                id: "apiKey",
+                type: "password",
+                autoComplete: "off",
+                value: draft.apiKey,
+                onChange: (e) => setDraft({ ...draft, apiKey: e.target.value }),
+              })
+            ),
+            h(
+              "div",
+              { className: "form-group" },
+              h("label", { htmlFor: "model-ro" }, "LLM model (fixed)"),
+              h("div", { id: "model-ro", className: "form-readonly", tabIndex: 0 }, "openai/gpt-oss-120b")
+            ),
+            h(
+              "div",
+              { className: "form-group" },
+              h("label", { htmlFor: "refreshInterval" }, "Refresh interval (seconds)"),
+              h("input", {
+                id: "refreshInterval",
+                type: "number",
+                min: 5,
+                value: draft.refreshInterval,
+                onChange: (e) => setDraft({ ...draft, refreshInterval: e.target.value }),
+              })
+            ),
+            h(
+              "div",
+              { className: "form-group" },
+              h("label", { htmlFor: "suggestionContextWindow" }, "Suggestion context window (chars)"),
+              h("input", {
+                id: "suggestionContextWindow",
+                type: "number",
+                min: 200,
+                value: draft.suggestionContextWindow,
+                onChange: (e) => setDraft({ ...draft, suggestionContextWindow: e.target.value }),
+              })
+            ),
+            h(
+              "div",
+              { className: "form-group" },
+              h("label", { htmlFor: "clickDetailContextWindow" }, "Click detail context window (chars)"),
+              h("input", {
+                id: "clickDetailContextWindow",
+                type: "number",
+                min: 200,
+                value: draft.clickDetailContextWindow,
+                onChange: (e) => setDraft({ ...draft, clickDetailContextWindow: e.target.value }),
+              })
+            ),
+            h(
+              "div",
+              { className: "form-group" },
+              h("label", { htmlFor: "chatContextWindow" }, "Chat context window (chars)"),
+              h("input", {
+                id: "chatContextWindow",
+                type: "number",
+                min: 200,
+                value: draft.chatContextWindow,
+                onChange: (e) => setDraft({ ...draft, chatContextWindow: e.target.value }),
+              })
+            ),
+            h(
+              "div",
+              { className: "form-group" },
+              h("label", { htmlFor: "suggestionPrompt" }, "Live suggestion prompt"),
+              h("textarea", {
+                id: "suggestionPrompt",
+                value: draft.suggestionPrompt,
+                onChange: (e) => setDraft({ ...draft, suggestionPrompt: e.target.value }),
+              })
+            ),
+            h(
+              "div",
+              { className: "form-group" },
+              h("label", { htmlFor: "chatSystemPrompt" }, "Chat system prompt"),
+              h("textarea", {
+                id: "chatSystemPrompt",
+                value: draft.chatSystemPrompt,
+                onChange: (e) => setDraft({ ...draft, chatSystemPrompt: e.target.value }),
+              })
+            ),
+            h(
+              "div",
+              { className: "form-group" },
+              h("label", { htmlFor: "clickDetailPrompt" }, "Suggestion click detail prompt"),
+              h("textarea", {
+                id: "clickDetailPrompt",
+                value: draft.clickDetailPrompt,
+                onChange: (e) => setDraft({ ...draft, clickDetailPrompt: e.target.value }),
+              })
+            ),
+            h(
+              "div",
+              { className: "modal-actions" },
+              h("button", { type: "button", className: "btn", onClick: onClose }, "Cancel"),
+              h(
+                "button",
+                {
+                  type: "button",
+                  className: "btn btn-primary",
+                  onClick: () => onSave(draft),
+                },
+                "Save"
+              )
+            )
+          )
+        )
+      );
+    }
+
+    function TranscriptPanel({ chunks, liveHint }) {
+      const bottomRef = useRef(null);
+      useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [chunks, liveHint]);
+      return h(
+        "section",
+        { className: "panel" },
+        h("div", { className: "panel-header" }, "Transcript"),
+        h(
+          "div",
+          { className: "panel-body" },
+          chunks.length === 0 && !liveHint && h("p", { style: { color: "var(--color-text-muted)" } }, "Start recording to capture audio. Transcript appears after each refresh cycle."),
+          chunks.map((c, i) =>
+            h(
+              "div",
+              { key: c.time + "-" + i, className: "transcript-chunk" },
+              h("div", { className: "transcript-time" }, formatTime(c.time)),
+              h("div", { className: "transcript-text" }, c.text)
+            )
+          ),
+          liveHint &&
+            h(
+              "div",
+              { className: "transcript-live" },
+              "Listening… capturing 1s slices; next transcription on timer or Refresh."
+            ),
+          h("div", { ref: bottomRef })
+        )
+      );
+    }
+
+    function SuggestionsPanel({ batches, loading, countdownSec, refreshSec, countdownPct, recording, onCardClick }) {
+      const scrollRef = useRef(null);
+      const headId = batches.length ? batches[0].id : null;
+      useEffect(() => {
+        if (scrollRef.current && headId != null) scrollRef.current.scrollTop = 0;
+      }, [headId]);
+      return h(
+        "section",
+        { className: "panel" },
+        h("div", { className: "panel-header" }, "Live suggestions"),
+        h(
+          "div",
+          { className: "suggestions-toolbar" },
+          h(
+            "div",
+            { className: "countdown-label" },
+            h("span", null, recording ? "Next auto-refresh" : "Start recording for auto-refresh"),
+            h("span", { style: { fontFamily: "var(--font-mono)" } }, recording ? countdownSec + "s / " + refreshSec + "s" : "—")
+          ),
+          h(
+            "div",
+            { className: "countdown-wrap" },
+            h("div", { className: "countdown-bar", style: { width: recording ? countdownPct + "%" : "0%" } })
+          )
+        ),
+        h(
+          "div",
+          { ref: scrollRef, className: "panel-body", style: { paddingTop: 0 } },
+          loading &&
+            h(
+              "div",
+              null,
+              h("div", { className: "skeleton-card" }),
+              h("div", { className: "skeleton-card" }),
+              h("div", { className: "skeleton-card" })
+            ),
+          batches.map((batch) =>
+            h(
+              "div",
+              { key: batch.id, className: "batch-block" },
+              h("div", { className: "batch-time" }, formatTime(batch.timestamp)),
+              batch.items.map((it, idx) => {
+                const typeClass = "type-" + String(it.type).toLowerCase();
+                return h(
+                  "div",
+                  {
+                    key: idx,
+                    className: "suggestion-card " + typeClass + (it.clicked ? " clicked" : ""),
+                    onClick: () => onCardClick(batch.id, idx, it),
+                    role: "button",
+                    tabIndex: 0,
+                    onKeyDown: (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onCardClick(batch.id, idx, it);
+                      }
+                    },
+                  },
+                  h(
+                    "div",
+                    { className: "suggestion-card-inner" },
+                    h("div", { className: "suggestion-card-border" }),
+                    h(
+                      "div",
+                      { className: "suggestion-card-content" },
+                      h(
+                        "div",
+                        { className: "suggestion-type-row" },
+                        h(Icon, { name: "spark", size: 14 }),
+                        h("span", { className: "type-tag" }, it.type)
+                      ),
+                      h("div", { className: "suggestion-preview" }, it.preview),
+                      it.detail && h("div", { className: "suggestion-detail" }, it.detail),
+                      h(
+                        "div",
+                        { className: "suggestion-card-hint" },
+                        "Tap card → streams a deeper, transcript-grounded brief in chat."
+                      )
+                    )
+                  )
+                );
+              })
+            )
+          )
+        )
+      );
+    }
+
+    function ChatPanel({ messages, input, setInput, onSend, onClear }) {
+      const bottomRef = useRef(null);
+      useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [messages]);
+      return h(
+        "section",
+        { className: "panel" },
+        h("div", { className: "panel-header" }, "Chat"),
+        h(
+          "div",
+          { className: "panel-body chat-messages" },
+          messages.length === 0 &&
+            h("p", { style: { color: "var(--color-text-muted)" } }, "Ask the copilot anything about the meeting. Expand a suggestion to stream a deep answer into chat."),
+          messages.map((msg, i) => {
+            const key = msg.id || "m-" + i;
+            if (msg.role === "user") {
+              return h(
+                "div",
+                {
+                  key,
+                  className: "chat-bubble chat-bubble-user",
+                },
+                msg.fromSuggestion && h("div", { className: "from-suggestion-label" }, "From suggestion"),
+                msg.content,
+                h("div", { className: "chat-meta" }, formatTime(msg.time))
+              );
+            }
+            return h(
+              "div",
+              {
+                key,
+                className: "chat-bubble chat-bubble-assistant markdown-lite",
+              },
+              msg.fromSuggestion && h("div", { className: "from-suggestion-label" }, "From suggestion"),
+              msg.suggestionPreview &&
+                h("div", { className: "chat-suggestion-anchor" }, msg.suggestionType + ": " + msg.suggestionPreview),
+              h("div", {
+                dangerouslySetInnerHTML: { __html: simpleMarkdownToHtml(msg.content) || (msg.streaming ? "" : "…") },
+              }),
+              msg.streaming && h("span", { className: "stream-cursor" }),
+              h("div", { className: "chat-meta" }, msg.streaming ? "Streaming…" : formatTime(msg.time))
+            );
+          }),
+          h("div", { ref: bottomRef })
+        ),
+        h(
+          "div",
+          { className: "chat-input-row" },
+          h("input", {
+            type: "text",
+            placeholder: "Message (grounded in transcript)…",
+            value: input,
+            onChange: (e) => setInput(e.target.value),
+            onKeyDown: (e) => e.key === "Enter" && onSend(),
+          }),
+          h(
+            "button",
+            { type: "button", className: "btn btn-primary", onClick: onSend, "aria-label": "Send" },
+            h(Icon, { name: "send", size: 18 })
+          ),
+          h(
+            "button",
+            { type: "button", className: "btn", onClick: onClear },
+            "Clear"
+          )
+        )
+      );
+    }
+
+    createRoot(document.getElementById("root")).render(h(App));
+  </script>
+</body>
+</html>
